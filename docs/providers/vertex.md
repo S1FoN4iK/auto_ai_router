@@ -434,6 +434,76 @@ For Gemini-backed `images.generate` / `images.edit`, the router converts the Ope
 
 The router also supports the dedicated Imagen API endpoint for image generation models.
 
+### Embeddings
+
+`/v1/embeddings` works for both `vertex-ai` and `gemini` credentials. Text-only models (`gemini-embedding-001`, `text-embedding-*`) keep the plain OpenAI input (a string or an array of strings) and go to Vertex AI `:predict` / Gemini API `:batchEmbedContents`.
+
+Gemini Embedding 2 (`gemini-embedding-2`, `gemini-embedding-2-preview`) is multimodal and uses the `embedContent` API:
+
+| Credential  | One vector                    | Several vectors                                           |
+| ----------- | ----------------------------- | --------------------------------------------------------- |
+| `vertex-ai` | `models/{model}:embedContent` | one `embedContent` call per vector, merged in input order |
+| `gemini`    | `models/{model}:embedContent` | synchronous `models/{model}:batchEmbedContents`           |
+
+Gemini Embedding 2 quotas are global, so its Vertex AI credentials normally use `location: global`. When one of the fanned-out Vertex AI calls fails, the router cancels the rest and answers with that call's status and body, so retries and fail2ban treat the request like any single call.
+
+#### Input format
+
+The top level follows OpenAI: `input` is one item or an array of items, and **every item yields one vector** (`data[i].index` is the item's position). An item is:
+
+- a string — text;
+- a content part — `{"type": "text" | "image_url" | "input_audio" | "video_url" | "file", ...}`, the same shapes as chat content parts;
+- an array of strings and content parts (or `{"content": [...]}`) — all its parts are fused into **one** vector (mixed input).
+
+| Part                                                                         | Sent as                                         |
+| ---------------------------------------------------------------------------- | ----------------------------------------------- |
+| `{"type": "text", "text": "..."}`                                            | text                                            |
+| `{"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}}`   | inline data, MIME type from the data URL        |
+| `{"type": "image_url", "image_url": {"url": "https://.../a.jpg"}}`           | file reference (`https://` or `gs://`)          |
+| `{"type": "input_audio", "input_audio": {"data": "...", "format": "mp3"}}`   | inline data (`mp3`, `wav`)                      |
+| `{"type": "video_url", "video_url": {"url": "gs://.../clip.mp4"}}`           | file reference, or inline data for `data:` URLs |
+| `{"type": "file", "file": {"file_data": "data:application/pdf;base64,..."}}` | inline data (PDF)                               |
+| `{"type": "file", "file": {"file_url": "gs://...", "mime_type": "..."}}`     | file reference                                  |
+
+A file reference needs a MIME type: it comes from the URL extension, or from `mime_type` / `format` on the part. Private-network and `file://` URLs are refused. Input the router cannot turn into a part (unknown part type, token id arrays, missing MIME type, broken base64) is rejected with 400 before any upstream call instead of being dropped silently. At most 100 items per request. Per-request media limits (6 images, 1 video, 1 audio file, 1 PDF of up to 6 pages, 8192 tokens in total) are enforced by Google.
+
+```python
+client.embeddings.create(
+    model="gemini-embedding-2",
+    dimensions=768,  # outputDimensionality, 128..3072
+    input=[
+        "task: search result | query: dog on a beach",  # vector 0
+        [  # vector 1: text + image
+            "title: none | text: a dog",
+            {
+                "type": "image_url",
+                "image_url": {"url": "data:image/png;base64,iVBOR..."},
+            },
+        ],
+        {
+            "type": "file",
+            "file": {"file_data": "data:application/pdf;base64,JVBER..."},
+        },  # vector 2
+    ],
+)
+```
+
+Gemini Embedding 2 has no `task_type`: put the task into the text (`task: ... | query: ...`), as Google recommends.
+
+#### Usage
+
+Usage comes from the response `usageMetadata` (`promptTokensDetails` on Vertex AI, `promptTokenDetails` on the Gemini API), never from a text-length estimate, and is reported per modality:
+
+```json
+"usage": {
+  "prompt_tokens": 1300,
+  "total_tokens": 1300,
+  "prompt_tokens_details": {"text_tokens": 132, "image_tokens": 258, "audio_tokens": 250, "video_tokens": 660}
+}
+```
+
+`IMAGE` and `DOCUMENT` (PDF pages are rendered and counted as images, 258 tokens per page) become `image_tokens`, `AUDIO` `audio_tokens`, `VIDEO` `video_tokens`; the rest of `prompt_tokens` is text. Billing prices each modality at its own rate (`input_cost_per_image_token`, `input_cost_per_audio_token`, `input_cost_per_video_token`) and only the text remainder at `input_cost_per_token`; vectors are not output tokens. See [Model Pricing](../litellm-integration/pricing.md).
+
 ### Streaming
 
 SSE streaming works transparently:
@@ -472,4 +542,5 @@ The router provides accurate token counting with modality breakdown:
 - **Completion tokens**: Total output tokens (includes thinking tokens)
 - **Cached tokens**: Reported separately (deducted from base cost to avoid double-charging)
 - **Audio tokens**: Tracked separately for accurate billing
+- **Image and video tokens**: Input images (`prompt_tokens_details.image_tokens`) and input video (`prompt_tokens_details.video_tokens`) are reported apart, so each can carry its own price
 - **Thinking tokens**: Included in completion count, tracked in `completion_tokens_details.reasoning_tokens`

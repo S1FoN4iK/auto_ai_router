@@ -70,6 +70,7 @@ CREATE TABLE air.spend_logs_kafka
     rejected_prediction_tokens UInt32,
     image_count UInt32,
     image_tokens UInt32,
+    video_input_tokens UInt32,
     output_image_tokens UInt32,
     web_search_requests UInt32,
     web_search_context_size Nullable(String),
@@ -84,6 +85,7 @@ CREATE TABLE air.spend_logs_kafka
     cached_output_cost Float64,
     prediction_cost Float64,
     image_cost Float64,
+    video_input_cost Float64,
     web_search_cost Float64,
     total_cost Float64,
 
@@ -184,6 +186,7 @@ CREATE TABLE air.spend_logs
     rejected_prediction_tokens UInt32,
     image_count UInt32,
     image_tokens UInt32,
+    video_input_tokens UInt32,
     output_image_tokens UInt32,
     web_search_requests UInt32,
     web_search_context_size Nullable(String),
@@ -198,6 +201,7 @@ CREATE TABLE air.spend_logs
     cached_output_cost Float64,
     prediction_cost Float64,
     image_cost Float64,
+    video_input_cost Float64,
     web_search_cost Float64,
     total_cost Float64,
 

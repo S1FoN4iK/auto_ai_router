@@ -1848,7 +1848,13 @@ func (p *Proxy) proxyRequest(w http.ResponseWriter, r *http.Request) {
 		// Execute HTTP request
 		var doErr error
 		attemptedCreds[cred.Name] = true
-		resp, doErr = p.client.Do(proxyReq) //nolint:gosec // G704: same targetURL as the request built above, host isn't attacker-controlled
+		if fanOut := embeddingFanOutBodies(conv); len(fanOut) > 1 {
+			// Vertex AI embedContent takes one content per call: one call per
+			// input, answered as a single merged response.
+			resp, doErr = p.doEmbedContentFanOut(proxyReq, fanOut)
+		} else {
+			resp, doErr = p.client.Do(proxyReq) //nolint:gosec // G704: same targetURL as the request built above, host isn't attacker-controlled
+		}
 		if doErr != nil {
 			if isClientCanceledTransportError(r, doErr) {
 				// The client is already gone -- trying another credential

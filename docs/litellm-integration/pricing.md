@@ -162,52 +162,53 @@ For reference:
 
 ### Available fields
 
-| Field                                                         | Description                                                                  |
-| ------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `input_cost_per_token`                                        | Regular input tokens                                                         |
-| `output_cost_per_token`                                       | Regular output tokens                                                        |
-| `input_cost_per_token_above_200k_tokens`                      | Input rate for tokens beyond the 200k threshold                              |
-| `output_cost_per_token_above_200k_tokens`                     | Output rate for tokens beyond the 200k threshold                             |
-| `input_cost_per_token_above_32k_tokens`                       | Full-session input rate when prompt exceeds 32k tokens                       |
-| `output_cost_per_token_above_32k_tokens`                      | Full-session output rate when prompt exceeds 32k tokens                      |
-| `input_cost_per_token_above_128k_tokens`                      | Full-session input rate when prompt exceeds 128k tokens                      |
-| `output_cost_per_token_above_128k_tokens`                     | Full-session output rate when prompt exceeds 128k tokens                     |
-| `input_cost_per_token_above_256k_tokens`                      | Full-session input rate when prompt exceeds 256k tokens                      |
-| `output_cost_per_token_above_256k_tokens`                     | Full-session output rate when prompt exceeds 256k tokens                     |
-| `input_cost_per_token_above_272k_tokens`                      | Full-session input rate when prompt exceeds 272k tokens                      |
-| `output_cost_per_token_above_272k_tokens`                     | Full-session output rate when prompt exceeds 272k tokens                     |
-| `input_cost_per_audio_token`                                  | Audio input tokens (falls back to `input_cost_per_token` if absent)          |
-| `output_cost_per_audio_token`                                 | Audio output tokens (falls back to `output_cost_per_token` if absent)        |
-| `input_cost_per_image_token`                                  | Image input tokens                                                           |
-| `output_cost_per_image_token`                                 | Image output tokens                                                          |
-| `output_cost_per_reasoning_token`                             | Reasoning/thinking tokens (falls back to `output_cost_per_token`)            |
-| `input_cost_per_cached_token`                                 | Cached prompt read cost (alias: `cache_read_input_token_cost`)               |
-| `cache_read_input_token_cost`                                 | LiteLLM-compatible alias for `input_cost_per_cached_token`                   |
-| `cache_creation_input_token_cost`                             | Prompt cache write cost (falls back to `input_cost_per_token`)               |
-| `cache_read_input_token_cost_above_200k_tokens`               | Full-session cache read rate when prompt exceeds 200k tokens                 |
-| `cache_creation_input_token_cost_above_200k_tokens`           | Full-session 5m/unclassified cache write rate above 200k                     |
-| `cache_creation_input_token_cost_above_1hr`                   | Anthropic 1h cache write rate (falls back to regular cache write rate)       |
-| `cache_creation_input_token_cost_above_1hr_above_200k_tokens` | Anthropic 1h cache write rate above 200k                                     |
-| `cache_read_input_token_cost_above_32k_tokens`                | Full-session cache read rate when prompt exceeds 32k tokens                  |
-| `cache_creation_input_token_cost_above_32k_tokens`            | Full-session cache write rate when prompt exceeds 32k tokens                 |
-| `cache_read_input_token_cost_above_128k_tokens`               | Full-session cache read rate when prompt exceeds 128k tokens                 |
-| `cache_creation_input_token_cost_above_128k_tokens`           | Full-session cache write rate when prompt exceeds 128k tokens                |
-| `cache_read_input_token_cost_above_256k_tokens`               | Full-session cache read rate when prompt exceeds 256k tokens                 |
-| `cache_creation_input_token_cost_above_256k_tokens`           | Full-session cache write rate when prompt exceeds 256k tokens                |
-| `cache_read_input_token_cost_above_272k_tokens`               | Full-session cache read rate when prompt exceeds 272k tokens                 |
-| `cache_creation_input_token_cost_above_272k_tokens`           | Full-session cache write rate when prompt exceeds 272k tokens                |
-| `cache_read_input_audio_token_cost`                           | Cached audio input rate (falls back to the selected cache read rate)         |
-| `output_cost_per_cached_token`                                | Cached output tokens (falls back to `output_cost_per_token`)                 |
-| `output_cost_per_prediction_token`                            | Accepted predicted-output tokens (falls back to `output_cost_per_token`)     |
-| `output_cost_per_image`                                       | Cost per generated image (takes priority over `output_cost_per_image_token`) |
-| `search_context_cost_per_query`                               | Web Search cost per request/call, keyed by `search_context_size_*`           |
-| `web_search_billing_unit`                                     | `per_query` or `per_prompt` Web Search charging mode                         |
+| Field                                                         | Description                                                                                  |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `input_cost_per_token`                                        | Regular input tokens                                                                         |
+| `output_cost_per_token`                                       | Regular output tokens                                                                        |
+| `input_cost_per_token_above_200k_tokens`                      | Input rate for tokens beyond the 200k threshold                                              |
+| `output_cost_per_token_above_200k_tokens`                     | Output rate for tokens beyond the 200k threshold                                             |
+| `input_cost_per_token_above_32k_tokens`                       | Full-session input rate when prompt exceeds 32k tokens                                       |
+| `output_cost_per_token_above_32k_tokens`                      | Full-session output rate when prompt exceeds 32k tokens                                      |
+| `input_cost_per_token_above_128k_tokens`                      | Full-session input rate when prompt exceeds 128k tokens                                      |
+| `output_cost_per_token_above_128k_tokens`                     | Full-session output rate when prompt exceeds 128k tokens                                     |
+| `input_cost_per_token_above_256k_tokens`                      | Full-session input rate when prompt exceeds 256k tokens                                      |
+| `output_cost_per_token_above_256k_tokens`                     | Full-session output rate when prompt exceeds 256k tokens                                     |
+| `input_cost_per_token_above_272k_tokens`                      | Full-session input rate when prompt exceeds 272k tokens                                      |
+| `output_cost_per_token_above_272k_tokens`                     | Full-session output rate when prompt exceeds 272k tokens                                     |
+| `input_cost_per_audio_token`                                  | Audio input tokens (falls back to `input_cost_per_token` if absent)                          |
+| `output_cost_per_audio_token`                                 | Audio output tokens (falls back to `output_cost_per_token` if absent)                        |
+| `input_cost_per_image_token`                                  | Image input tokens (PDF pages included; falls back to `input_cost_per_token`)                |
+| `input_cost_per_video_token`                                  | Video input tokens (falls back to `input_cost_per_image_token`, then `input_cost_per_token`) |
+| `output_cost_per_image_token`                                 | Image output tokens                                                                          |
+| `output_cost_per_reasoning_token`                             | Reasoning/thinking tokens (falls back to `output_cost_per_token`)                            |
+| `input_cost_per_cached_token`                                 | Cached prompt read cost (alias: `cache_read_input_token_cost`)                               |
+| `cache_read_input_token_cost`                                 | LiteLLM-compatible alias for `input_cost_per_cached_token`                                   |
+| `cache_creation_input_token_cost`                             | Prompt cache write cost (falls back to `input_cost_per_token`)                               |
+| `cache_read_input_token_cost_above_200k_tokens`               | Full-session cache read rate when prompt exceeds 200k tokens                                 |
+| `cache_creation_input_token_cost_above_200k_tokens`           | Full-session 5m/unclassified cache write rate above 200k                                     |
+| `cache_creation_input_token_cost_above_1hr`                   | Anthropic 1h cache write rate (falls back to regular cache write rate)                       |
+| `cache_creation_input_token_cost_above_1hr_above_200k_tokens` | Anthropic 1h cache write rate above 200k                                                     |
+| `cache_read_input_token_cost_above_32k_tokens`                | Full-session cache read rate when prompt exceeds 32k tokens                                  |
+| `cache_creation_input_token_cost_above_32k_tokens`            | Full-session cache write rate when prompt exceeds 32k tokens                                 |
+| `cache_read_input_token_cost_above_128k_tokens`               | Full-session cache read rate when prompt exceeds 128k tokens                                 |
+| `cache_creation_input_token_cost_above_128k_tokens`           | Full-session cache write rate when prompt exceeds 128k tokens                                |
+| `cache_read_input_token_cost_above_256k_tokens`               | Full-session cache read rate when prompt exceeds 256k tokens                                 |
+| `cache_creation_input_token_cost_above_256k_tokens`           | Full-session cache write rate when prompt exceeds 256k tokens                                |
+| `cache_read_input_token_cost_above_272k_tokens`               | Full-session cache read rate when prompt exceeds 272k tokens                                 |
+| `cache_creation_input_token_cost_above_272k_tokens`           | Full-session cache write rate when prompt exceeds 272k tokens                                |
+| `cache_read_input_audio_token_cost`                           | Cached audio input rate (falls back to the selected cache read rate)                         |
+| `output_cost_per_cached_token`                                | Cached output tokens (falls back to `output_cost_per_token`)                                 |
+| `output_cost_per_prediction_token`                            | Accepted predicted-output tokens (falls back to `output_cost_per_token`)                     |
+| `output_cost_per_image`                                       | Cost per generated image (takes priority over `output_cost_per_image_token`)                 |
+| `search_context_cost_per_query`                               | Web Search cost per request/call, keyed by `search_context_size_*`                           |
+| `web_search_billing_unit`                                     | `per_query` or `per_prompt` Web Search charging mode                                         |
 
 ## Cost Calculation
 
 All providers return specialised token counts as **subsets** of the totals:
 
-- `prompt_tokens` (Vertex AI, OpenAI) already includes `audio_input_tokens`, `cached_input_tokens`
+- `prompt_tokens` (Vertex AI, OpenAI) already includes `audio_input_tokens`, `cached_input_tokens`, input `image_tokens` and `video_input_tokens`
 - `completion_tokens` (all providers) already includes `reasoning_tokens`, `audio_output_tokens`, prediction tokens
 - Anthropic reports cache tokens separately; OpenAI-compatible APIs report them in prompt/input token details
 
@@ -215,12 +216,15 @@ To avoid billing the same tokens at two different rates, the calculator first co
 
 ```
 regular_input  = prompt_tokens - audio_input_tokens - cached_input_tokens - cache_creation_tokens
+                               - image_tokens - video_input_tokens
 regular_output = completion_tokens - audio_output_tokens - reasoning_tokens
                                    - accepted_prediction_tokens - rejected_prediction_tokens
 
 total = regular_input  × input_cost_per_token
       + regular_output × output_cost_per_token
       + audio_input_tokens  × input_cost_per_audio_token
+      + image_tokens        × input_cost_per_image_token
+      + video_input_tokens  × input_cost_per_video_token
       + audio_output_tokens × output_cost_per_audio_token
       + cached_text_tokens  × cache_read_input_token_cost
       + cached_audio_tokens × cache_read_input_audio_token_cost
@@ -318,6 +322,8 @@ Example: a model with only `input_cost_per_token_above_128k_tokens` and `input_c
 | Reasoning           | `reasoning_tokens × output_cost_per_reasoning_token` (falls back to regular output rate)                                                            |
 | Accepted prediction | `accepted_prediction_tokens × output_cost_per_prediction_token` (falls back to regular output rate)                                                 |
 | Rejected prediction | `rejected_prediction_tokens × output_cost_per_token` (always at regular output rate)                                                                |
+| Image input         | `image_tokens × input_cost_per_image_token` (falls back to regular input rate)                                                                      |
+| Video input         | `video_input_tokens × input_cost_per_video_token` (falls back to the image input rate, then regular input rate)                                     |
 | Images              | `image_count × output_cost_per_image` OR `output_image_tokens × output_cost_per_image_token`                                                        |
 | Web Search          | `billable_web_search_count × search_context_cost_per_query[search_context_size]`, with `per_prompt` clamped to one                                  |
 
@@ -347,7 +353,7 @@ Anthropic's `cache_creation_token_details` (`ephemeral_5m_input_tokens` and `eph
 
 ### Spend storage contract
 
-AIR keeps LiteLLM's upstream PostgreSQL schema unchanged. `LiteLLM_SpendLogs.spend` and the daily user, team, organization, and end-user tables contain the total cost. Cache and Web Search breakdowns are stored in `LiteLLM_SpendLogs.metadata`.
+AIR keeps LiteLLM's upstream PostgreSQL schema unchanged. `LiteLLM_SpendLogs.spend` and the daily user, team, organization, and end-user tables contain the total cost. Cache, Web Search and input modality breakdowns are stored in `LiteLLM_SpendLogs.metadata` (`usage_object.prompt_tokens_details.image_tokens` / `audio_tokens` / `video_tokens`, `cost_breakdown.image_cost` / `audio_input_cost` / `video_input_cost`).
 
 Kafka and ClickHouse expose the same breakdown as typed fields, including `web_search_requests` and `web_search_cost`. Use that analytics path when structured reconciliation by usage type is required.
 
