@@ -445,7 +445,10 @@ Gemini Embedding 2 (`gemini-embedding-2`, `gemini-embedding-2-preview`) is multi
 | `vertex-ai` | `models/{model}:embedContent` | one `embedContent` call per vector, merged in input order |
 | `gemini`    | `models/{model}:embedContent` | synchronous `models/{model}:batchEmbedContents`           |
 
-Gemini Embedding 2 quotas are global, so its Vertex AI credentials normally use `location: global`. When one of the fanned-out Vertex AI calls fails, the router cancels the rest and answers with that call's status and body, so retries and fail2ban treat the request like any single call.
+Gemini Embedding 2 quotas are global, so its Vertex AI credentials normally use `location: global`. When one of the fanned-out Vertex AI calls fails, the router launches no further calls, lets the ones in flight finish and answers with the failed call's status and body, so retries and fail2ban treat the request like any single call. Two rules keep a failure from multiplying provider-billed calls:
+
+- a retry on the next Vertex AI credential sends only the inputs that have no reply yet; replies already received are reused (only for the same provider model);
+- a 400/413/422 for one input while another input embedded fine on the same credential faults the input, not the credential, and is not retried.
 
 #### Input format
 
@@ -492,7 +495,7 @@ Gemini Embedding 2 has no `task_type`: put the task into the text (`task: ... | 
 
 #### Usage
 
-Usage comes from the response `usageMetadata` (`promptTokensDetails` on Vertex AI, `promptTokenDetails` on the Gemini API), never from a text-length estimate, and is reported per modality:
+Usage comes from the response `usageMetadata` (`promptTokensDetails` on Vertex AI, `promptTokenDetails` on the Gemini API) and is reported per modality. Only a reply that carries no usage at all falls back to a text-length estimate (~4 characters per token over the text parts); media parts cannot be sized from the request, so the router logs a warning for every such reply.
 
 ```json
 "usage": {

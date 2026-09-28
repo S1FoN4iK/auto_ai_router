@@ -255,8 +255,9 @@ func TestEmbedContentToOpenAI_SingleEmbedContentWithModalityUsage(t *testing.T) 
 		},
 		"truncated": false
 	}`
-	result, err := EmbedContentToOpenAI([]byte(body), "gemini-embedding-2")
+	result, estimated, err := EmbedContentToOpenAI([]byte(body), "gemini-embedding-2", nil)
 	require.NoError(t, err)
+	assert.False(t, estimated)
 
 	var resp openai.OpenAIEmbeddingResponse
 	require.NoError(t, json.Unmarshal(result, &resp))
@@ -285,7 +286,7 @@ func TestEmbedContentToOpenAI_GeminiBatchWithAudioVideoAndDocument(t *testing.T)
 			]
 		}
 	}`
-	result, err := EmbedContentToOpenAI([]byte(body), "gemini-embedding-2")
+	result, _, err := EmbedContentToOpenAI([]byte(body), "gemini-embedding-2", nil)
 	require.NoError(t, err)
 
 	var resp openai.OpenAIEmbeddingResponse
@@ -301,17 +302,33 @@ func TestEmbedContentToOpenAI_GeminiBatchWithAudioVideoAndDocument(t *testing.T)
 		resp.Usage.PromptTokensDetails)
 }
 
-func TestEmbedContentToOpenAI_NoUsageIsNotEstimated(t *testing.T) {
-	result, err := EmbedContentToOpenAI([]byte(`{"embedding":{"values":[0.1,0.2]}}`), "gemini-embedding-2")
+func TestEmbedContentToOpenAI_NoUsageFallsBackToTextEstimate(t *testing.T) {
+	// A reply without usageMetadata must not bill $0: the text parts are
+	// estimated at ~4 characters per token (28 + 4 characters -> 7 + 1), the
+	// image cannot be sized and is left out, and the caller is told.
+	request := `{"model":"gemini-embedding-2","input":["What is the meaning of life?",
+		[{"type":"text","text":"abcd"},{"type":"image_url","image_url":{"url":"data:image/png;base64,iVBORw0KGgo="}}]]}`
+	result, estimated, err := EmbedContentToOpenAI([]byte(`{"embeddings":[{"values":[0.1]},{"values":[0.2]}]}`), "gemini-embedding-2", []byte(request))
 	require.NoError(t, err)
+	assert.True(t, estimated)
 	var resp openai.OpenAIEmbeddingResponse
 	require.NoError(t, json.Unmarshal(result, &resp))
-	assert.Equal(t, 0, resp.Usage.PromptTokens, "no length/4 heuristic for Gemini Embedding 2")
+	assert.Equal(t, 8, resp.Usage.PromptTokens)
+	assert.Equal(t, 8, resp.Usage.TotalTokens)
 	assert.Nil(t, resp.Usage.PromptTokensDetails)
 }
 
+func TestEmbedContentToOpenAI_NoUsageAndNoRequestIsZeroButFlagged(t *testing.T) {
+	result, estimated, err := EmbedContentToOpenAI([]byte(`{"embedding":{"values":[0.1,0.2]}}`), "gemini-embedding-2", nil)
+	require.NoError(t, err)
+	assert.True(t, estimated, "the caller still learns the reply had no usage")
+	var resp openai.OpenAIEmbeddingResponse
+	require.NoError(t, json.Unmarshal(result, &resp))
+	assert.Equal(t, 0, resp.Usage.PromptTokens)
+}
+
 func TestEmbedContentToOpenAI_DetailsAboveCountRaisePromptTokens(t *testing.T) {
-	result, err := EmbedContentToOpenAI([]byte(`{"embedding":{"values":[1]},"usageMetadata":{"promptTokensDetails":[{"modality":"IMAGE","tokenCount":258}]}}`), "gemini-embedding-2")
+	result, _, err := EmbedContentToOpenAI([]byte(`{"embedding":{"values":[1]},"usageMetadata":{"promptTokensDetails":[{"modality":"IMAGE","tokenCount":258}]}}`), "gemini-embedding-2", nil)
 	require.NoError(t, err)
 	var resp openai.OpenAIEmbeddingResponse
 	require.NoError(t, json.Unmarshal(result, &resp))
@@ -320,7 +337,7 @@ func TestEmbedContentToOpenAI_DetailsAboveCountRaisePromptTokens(t *testing.T) {
 }
 
 func TestEmbedContentToOpenAI_RejectsResponseWithoutEmbeddings(t *testing.T) {
-	_, err := EmbedContentToOpenAI([]byte(`{"usageMetadata":{"promptTokenCount":3}}`), "gemini-embedding-2")
+	_, _, err := EmbedContentToOpenAI([]byte(`{"usageMetadata":{"promptTokenCount":3}}`), "gemini-embedding-2", nil)
 	require.Error(t, err)
 }
 
@@ -344,7 +361,7 @@ func TestMergeEmbedContentResponses_KeepsOrderAndSumsUsage(t *testing.T) {
 		}
 	}`, string(merged))
 
-	result, err := EmbedContentToOpenAI(merged, "gemini-embedding-2")
+	result, _, err := EmbedContentToOpenAI(merged, "gemini-embedding-2", nil)
 	require.NoError(t, err)
 	var resp openai.OpenAIEmbeddingResponse
 	require.NoError(t, json.Unmarshal(result, &resp))

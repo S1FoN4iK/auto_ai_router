@@ -111,8 +111,14 @@ type ProviderConverter struct {
 	// GeminiEmbeddingToOpenAI can estimate prompt_tokens when the upstream
 	// API (Gemini batchEmbedContents) does not return token statistics.
 	// Only legacy text-only models use it; embedContent-family models
-	// (vertex.IsEmbedContentModel) are billed from usageMetadata alone.
+	// (vertex.IsEmbedContentModel) are billed from usageMetadata.
 	inputTexts []string
+	// embedContentRequest is the OpenAI body of an embedContent-family
+	// embeddings request, kept so ResponseTo can estimate usage from its text
+	// parts when a reply carries no usageMetadata (see EmbeddingUsageEstimated).
+	embedContentRequest []byte
+	// embeddingUsageEstimated is set by ResponseTo when that estimate was used.
+	embeddingUsageEstimated bool
 	// embedContentInputs is the number of vectors an embedContent-family
 	// embeddings request asks for; it picks the Gemini API method in BuildURL.
 	embedContentInputs int
@@ -219,6 +225,7 @@ func (c *ProviderConverter) RequestFrom(body []byte) ([]byte, error) {
 				if err != nil {
 					return nil, err
 				}
+				c.embedContentRequest = body
 				c.embedContentInputs = len(bodies)
 				if len(bodies) == 1 {
 					return bodies[0], nil
@@ -233,6 +240,7 @@ func (c *ProviderConverter) RequestFrom(body []byte) ([]byte, error) {
 				if err != nil {
 					return nil, err
 				}
+				c.embedContentRequest = body
 				c.embedContentInputs = inputs
 				return converted, nil
 			}
@@ -396,7 +404,9 @@ func (c *ProviderConverter) ResponseTo(body []byte) ([]byte, error) {
 		switch c.providerType {
 		case config.ProviderTypeVertexAI, config.ProviderTypeGemini:
 			if vertex.IsEmbedContentModel(c.mode.ModelID) {
-				return vertex.EmbedContentToOpenAI(body, c.mode.ModelID)
+				converted, estimated, err := vertex.EmbedContentToOpenAI(body, c.mode.ModelID, c.embedContentRequest)
+				c.embeddingUsageEstimated = estimated
+				return converted, err
 			}
 			if c.providerType == config.ProviderTypeVertexAI {
 				return vertex.VertexEmbeddingToOpenAI(body, c.mode.ModelID)
@@ -526,6 +536,14 @@ func (c *ProviderConverter) BuildURL(cred *config.CredentialConfig) string {
 // vertex.MergeEmbedContentResponses before ResponseTo.
 func (c *ProviderConverter) EmbeddingFanOutBodies() [][]byte {
 	return c.embedContentFanOut
+}
+
+// EmbeddingUsageEstimated reports whether the last ResponseTo had to estimate
+// the usage of an embedContent-family embeddings reply from the request text,
+// because the provider returned no usageMetadata. Media parts are not in that
+// estimate, so the caller should log it.
+func (c *ProviderConverter) EmbeddingUsageEstimated() bool {
+	return c.embeddingUsageEstimated
 }
 
 // RewrittenContentType returns the new Content-Type header value when RequestFrom rewrote

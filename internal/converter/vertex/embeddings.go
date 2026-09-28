@@ -662,7 +662,7 @@ type geminiBatchEmbeddingResponse struct {
 // Token usage comes from usageMetadata, then per-embedding statistics; only when
 // the response carries neither is it estimated from inputTexts using a ~4
 // chars/token heuristic (legacy text-only models; embedContent-family models
-// go through EmbedContentToOpenAI and are never estimated).
+// go through EmbedContentToOpenAI).
 func GeminiEmbeddingToOpenAI(body []byte, model string, inputTexts []string) ([]byte, error) {
 	var resp geminiBatchEmbeddingResponse
 	if err := json.Unmarshal(body, &resp); err != nil {
@@ -719,19 +719,24 @@ func GeminiEmbeddingToOpenAI(body []byte, model string, inputTexts []string) ([]
 // EmbedContentToOpenAI converts an embedContent-family response — a single
 // embedContent call, Gemini API batchEmbedContents, or the merged Vertex AI
 // fan-out (MergeEmbedContentResponses) — to OpenAI embeddings format. Vectors
-// keep request order and index; usage comes from usageMetadata only, split by
+// keep request order and index; usage comes from usageMetadata, split by
 // modality in prompt_tokens_details. Embedding vectors are not output tokens.
-func EmbedContentToOpenAI(body []byte, model string) ([]byte, error) {
+//
+// A reply without usage would otherwise bill nothing, so usage is then
+// estimated from the text parts of request (the OpenAI request body) and
+// estimated is true: the caller should log it, since media parts cannot be
+// sized from the request and stay unbilled.
+func EmbedContentToOpenAI(body []byte, model string, request []byte) (converted []byte, estimated bool, err error) {
 	var resp embedContentResponse
 	if err := json.Unmarshal(body, &resp); err != nil {
-		return nil, fmt.Errorf("failed to parse embedContent response: %w", err)
+		return nil, false, fmt.Errorf("failed to parse embedContent response: %w", err)
 	}
 	vectors := resp.Embeddings
 	if resp.Embedding != nil {
 		vectors = append([]embedContentValues{*resp.Embedding}, vectors...)
 	}
 	if len(vectors) == 0 {
-		return nil, fmt.Errorf("embedContent response carries no embeddings")
+		return nil, false, fmt.Errorf("embedContent response carries no embeddings")
 	}
 
 	data := make([]openai.OpenAIEmbeddingData, len(vectors))
@@ -747,12 +752,40 @@ func EmbedContentToOpenAI(body []byte, model string) ([]byte, error) {
 	if resp.UsageMetadata != nil {
 		usage = resp.UsageMetadata.openAIUsage()
 	}
-	return json.Marshal(openai.OpenAIEmbeddingResponse{
+	if usage.PromptTokens == 0 {
+		usage = estimateEmbedContentTextUsage(request)
+		estimated = true
+	}
+	converted, err = json.Marshal(openai.OpenAIEmbeddingResponse{
 		Object: "list",
 		Data:   data,
 		Model:  model,
 		Usage:  usage,
 	})
+	return converted, estimated, err
+}
+
+// estimateEmbedContentTextUsage sizes the text parts of an embedContent-family
+// OpenAI request at ~4 characters per token, the estimate the legacy text-only
+// path uses. It is zero when request is empty or cannot be parsed.
+func estimateEmbedContentTextUsage(request []byte) openai.OpenAIEmbeddingUsage {
+	var req openai.OpenAIEmbeddingRequest
+	if len(request) == 0 || json.Unmarshal(request, &req) != nil {
+		return openai.OpenAIEmbeddingUsage{}
+	}
+	contents, err := parseEmbeddingContents(req.Input)
+	if err != nil {
+		return openai.OpenAIEmbeddingUsage{}
+	}
+	tokens := 0
+	for _, content := range contents {
+		for _, part := range content.Parts {
+			if part.Text != "" {
+				tokens += estimateTokens(part.Text)
+			}
+		}
+	}
+	return openai.OpenAIEmbeddingUsage{PromptTokens: tokens, TotalTokens: tokens}
 }
 
 // MergeEmbedContentResponses joins single-content Vertex AI embedContent

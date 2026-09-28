@@ -80,6 +80,20 @@ func TestProviderConverter_GeminiAPIGeminiEmbedding2PicksMethodByInputCount(t *t
 	usage := single.UsageFromResponse(openAIBody)
 	require.NotNil(t, usage)
 	assert.Equal(t, 4, usage.PromptTokens)
+	assert.False(t, single.EmbeddingUsageEstimated())
+}
+
+func TestProviderConverter_GeminiEmbedding2ReplyWithoutUsageIsEstimatedAndFlagged(t *testing.T) {
+	conv := embeddingsConverter(config.ProviderTypeVertexAI, "gemini-embedding-2")
+	_, err := conv.RequestFrom([]byte(`{"input":["What is the meaning of life?","abcd"]}`))
+	require.NoError(t, err)
+
+	openAIBody, err := conv.ResponseTo([]byte(`{"embeddings":[{"values":[1]},{"values":[2]}]}`))
+	require.NoError(t, err)
+	assert.True(t, conv.EmbeddingUsageEstimated())
+	usage := conv.UsageFromResponse(openAIBody)
+	require.NotNil(t, usage, "a reply without usage must not bill $0")
+	assert.Equal(t, 8, usage.PromptTokens)
 }
 
 func TestProviderConverter_GeminiEmbedding001KeepsLegacyPaths(t *testing.T) {
