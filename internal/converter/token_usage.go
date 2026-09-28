@@ -206,6 +206,9 @@ type TokenCosts struct {
 	VideoInputCost    float64
 	WebSearchCost     float64
 	TotalCost         float64
+	MarginPercent     float64
+	MarginFixedAmount float64
+	MarginTotalAmount float64
 }
 
 func NormalizeWebSearchContextSize(size string) string {
