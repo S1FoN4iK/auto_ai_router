@@ -436,44 +436,14 @@ The router also supports the dedicated Imagen API endpoint for image generation 
 
 ### Embeddings
 
-`/v1/embeddings` works for both `vertex-ai` and `gemini` credentials. Text-only models (`gemini-embedding-001`, `text-embedding-*`) keep the plain OpenAI input (a string or an array of strings) and go to Vertex AI `:predict` / Gemini API `:batchEmbedContents`.
+`/v1/embeddings` works with `vertex-ai` and `gemini` credentials. Text-only models (`gemini-embedding-001`, `text-embedding-*`) take the usual OpenAI input: a string or an array of strings.
 
-Gemini Embedding 2 (`gemini-embedding-2`, `gemini-embedding-2-preview`) is multimodal and uses the `embedContent` API:
-
-| Credential  | One vector                    | Several vectors                                           |
-| ----------- | ----------------------------- | --------------------------------------------------------- |
-| `vertex-ai` | `models/{model}:embedContent` | one `embedContent` call per vector, merged in input order |
-| `gemini`    | `models/{model}:embedContent` | synchronous `models/{model}:batchEmbedContents`           |
-
-Gemini Embedding 2 quotas are global, so its Vertex AI credentials normally use `location: global`. When one of the fanned-out Vertex AI calls fails, the router launches no further calls, lets the ones in flight finish and answers with the failed call's status and body, so retries and fail2ban treat the request like any single call. Two rules keep a failure from multiplying provider-billed calls:
-
-- a retry on the next Vertex AI credential sends only the inputs that have no reply yet; replies already received are reused (only for the same provider model);
-- a 400/413/422 for one input while another input embedded fine on the same credential faults the input, not the credential, and is not retried.
-
-#### Input format
-
-The top level follows OpenAI: `input` is one item or an array of items, and **every item yields one vector** (`data[i].index` is the item's position). An item is:
-
-- a string — text;
-- a content part — `{"type": "text" | "image_url" | "input_audio" | "video_url" | "file", ...}`, the same shapes as chat content parts;
-- an array of strings and content parts (or `{"content": [...]}`) — all its parts are fused into **one** vector (mixed input).
-
-| Part                                                                         | Sent as                                         |
-| ---------------------------------------------------------------------------- | ----------------------------------------------- |
-| `{"type": "text", "text": "..."}`                                            | text                                            |
-| `{"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}}`   | inline data, MIME type from the data URL        |
-| `{"type": "image_url", "image_url": {"url": "https://.../a.jpg"}}`           | file reference (`https://` or `gs://`)          |
-| `{"type": "input_audio", "input_audio": {"data": "...", "format": "mp3"}}`   | inline data (`mp3`, `wav`)                      |
-| `{"type": "video_url", "video_url": {"url": "gs://.../clip.mp4"}}`           | file reference, or inline data for `data:` URLs |
-| `{"type": "file", "file": {"file_data": "data:application/pdf;base64,..."}}` | inline data (PDF)                               |
-| `{"type": "file", "file": {"file_url": "gs://...", "mime_type": "..."}}`     | file reference                                  |
-
-A file reference needs a MIME type: it comes from the URL extension, or from `mime_type` / `format` on the part. Private-network and `file://` URLs are refused. Input the router cannot turn into a part (unknown part type, token id arrays, missing MIME type, broken base64) is rejected with 400 before any upstream call instead of being dropped silently. At most 100 items per request. Per-request media limits (6 images, 1 video, 1 audio file, 1 PDF of up to 6 pages, 8192 tokens in total) are enforced by Google.
+Gemini Embedding 2 (`gemini-embedding-2`, `gemini-embedding-2-preview`) is multimodal. Every item of `input` gives one vector (`data[i].index` is the item's position). An item is a string, a content part in the same shape as in chat (see [Content Types](#content-types)), or an array of strings and parts that are embedded together as **one** vector:
 
 ```python
 client.embeddings.create(
     model="gemini-embedding-2",
-    dimensions=768,  # outputDimensionality, 128..3072
+    dimensions=768,
     input=[
         "task: search result | query: dog on a beach",  # vector 0
         [  # vector 1: text + image
@@ -491,21 +461,12 @@ client.embeddings.create(
 )
 ```
 
-Gemini Embedding 2 has no `task_type`: put the task into the text (`task: ... | query: ...`), as Google recommends.
+- Media goes inline (`data:` URL or base64) or as a public `https://` / `gs://` link; a link needs a MIME type, taken from the file extension or from `mime_type` on the part.
+- Input the router cannot convert is rejected with 400 before any call to Google. At most 100 items per request.
+- There is no `task_type`: put the task into the text, as in the example.
+- On Vertex AI (use `location: global`) each vector is a separate `embedContent` call, sent in parallel. A retry on the next credential re-sends only the inputs that have no vector yet; an input Google rejects (400/413/422) while the others succeed is not retried.
 
-#### Usage
-
-Usage comes from the response `usageMetadata` (`promptTokensDetails` on Vertex AI, `promptTokenDetails` on the Gemini API) and is reported per modality. Only a reply that carries no usage at all falls back to a text-length estimate (~4 characters per token over the text parts); media parts cannot be sized from the request, so the router logs a warning for every such reply.
-
-```json
-"usage": {
-  "prompt_tokens": 1300,
-  "total_tokens": 1300,
-  "prompt_tokens_details": {"text_tokens": 132, "image_tokens": 258, "audio_tokens": 250, "video_tokens": 660}
-}
-```
-
-`IMAGE` and `DOCUMENT` (PDF pages are rendered and counted as images, 258 tokens per page) become `image_tokens`, `AUDIO` `audio_tokens`, `VIDEO` `video_tokens`; the rest of `prompt_tokens` is text. Billing prices each modality at its own rate (`input_cost_per_image_token`, `input_cost_per_audio_token`, `input_cost_per_video_token`) and only the text remainder at `input_cost_per_token`; vectors are not output tokens. See [Model Pricing](../litellm-integration/pricing.md).
+`usage.prompt_tokens_details` splits the tokens by modality (`text_tokens`, `image_tokens`, `audio_tokens`, `video_tokens`; PDF pages count as images), and each modality is billed at its own rate (see [Model Pricing](../litellm-integration/pricing.md)). If Google returns no usage, the text is estimated at ~4 characters per token (media is not counted) and a warning is logged.
 
 ### Streaming
 
@@ -545,5 +506,5 @@ The router provides accurate token counting with modality breakdown:
 - **Completion tokens**: Total output tokens (includes thinking tokens)
 - **Cached tokens**: Reported separately (deducted from base cost to avoid double-charging)
 - **Audio tokens**: Tracked separately for accurate billing
-- **Image and video tokens**: Input images (`prompt_tokens_details.image_tokens`) and input video (`prompt_tokens_details.video_tokens`) are reported apart, so each can carry its own price
+- **Image and video tokens**: Reported separately (`prompt_tokens_details.image_tokens` / `video_tokens`), each at its own price
 - **Thinking tokens**: Included in completion count, tracked in `completion_tokens_details.reasoning_tokens`
