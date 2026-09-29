@@ -94,7 +94,7 @@ The init DDL runs only for an empty ClickHouse data directory. Before deploying 
 
 The migration detaches the materialized view, adds the fields to both the MergeTree and Kafka tables, then reattaches the view. For replicated production tables, add the cluster-specific `ON CLUSTER` clause required by your deployment.
 
-For `video_input_tokens` / `video_input_cost`, apply [`clickhouse/migrations/003_video_input_columns.sql`](../../clickhouse/migrations/003_video_input_columns.sql) the same way.
+Apply the later migrations the same way: [`clickhouse/migrations/003_upstream_send_ms.sql`](../../clickhouse/migrations/003_upstream_send_ms.sql) (`upstream_send_ms`) and [`clickhouse/migrations/004_video_input_columns.sql`](../../clickhouse/migrations/004_video_input_columns.sql) (`video_input_tokens` / `video_input_cost`).
 
 After re-enabling publishing, send one synthetic event with non-zero `cached_audio_input_tokens`, `cache_creation_5m_tokens`, `cache_creation_1h_tokens`, `web_search_requests`, and `web_search_cost`. Verify that the row appears in `air.spend_logs` and that `system.kafka_consumers` reports no parse exceptions before completing the rollout.
 
