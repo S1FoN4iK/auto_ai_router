@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// xaiTestPrices mirrors the grok-4.7 row of the VseLLM/Avito price list
-// (markup 1.3 included) and the image model its image_generation tool uses.
+// xaiTestPrices is a grok-4.7 row using every xAI billing field and the
+// image model its image_generation tool uses.
 const xaiTestPrices = `{
   "grok-4.7": {
     "input_cost_per_token": 0.0000026,

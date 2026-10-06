@@ -16,8 +16,8 @@ const xaiChatUsageBody = `{"id":"c1","object":"chat.completion","model":"grok-4.
 	"completion_tokens_details":{"reasoning_tokens":94,"audio_tokens":0,"accepted_prediction_tokens":0,"rejected_prediction_tokens":0},
 	"num_sources_used":0,"cost_in_usd_ticks":37756000}}`
 
-// The same model through Requesty (live response, 17.08.2026): reasoning
-// inside completion_tokens (250 + 323 = 573), cost in USD.
+// The same model through Requesty: reasoning inside completion_tokens
+// (250 + 323 = 573), cost in USD.
 const requestyChatUsageBody = `{"id":"c2","object":"chat.completion","model":"grok-4.6","choices":[],
 	"usage":{"completion_tokens":323,"completion_tokens_details":{"reasoning_tokens":309},
 	"prompt_tokens":250,"prompt_tokens_details":{"cached_tokens":128},"total_tokens":573,"cost":0.002246}}`

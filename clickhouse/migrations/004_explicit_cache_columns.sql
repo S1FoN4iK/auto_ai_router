@@ -20,12 +20,13 @@
 -- ON CLUSTER clause your deployment needs.
 --
 -- Pause AIR Kafka publishing before running this migration. Safe to re-run
--- on its own only while it is the last applied migration: never run 004 again
--- once 005_tool_usage_columns.sql has been applied, for the same reason
+-- on its own -- but never run it again after 005_video_input_columns.sql/
+-- 006_tool_usage_columns.sql have already been applied, for the same reason
 -- 002_cache_web_search_columns.sql's doc comment spells out -- it would
 -- rebuild air.spend_logs_kafka from only 004's column set, narrowing it
--- back below whatever the later migration added, and break ingestion with
--- NUMBER_OF_COLUMNS_DOESNT_MATCH until that later migration is re-applied.
+-- back below the columns those later migrations already added, and break
+-- ingestion with NUMBER_OF_COLUMNS_DOESNT_MATCH until they are re-applied.
+-- Apply 002/003/004/005/006 forward, in order, never backward.
 
 DROP TABLE IF EXISTS air.spend_logs_mv;
 

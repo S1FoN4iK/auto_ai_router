@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// grokTestPrices are the VseLLM/Avito rows for grok-4.7 (with the markup of
-// 1.3 already applied) plus the image model its image_generation tool uses,
-// decoded the same lenient way the price file is.
+// grokTestPrices is a grok-4.7 row using every xAI billing field plus the
+// image model its image_generation tool uses, decoded the same lenient way
+// the price file is.
 const grokTestPrices = `{
   "grok-4.7": {
     "input_cost_per_token": 0.0000026,
@@ -51,7 +51,7 @@ func loadGrokTestPrices(t *testing.T) map[string]*ModelPrice {
 	return prices
 }
 
-// grokExpectedTokenCost is the bill the spec asks for: below 200k prompt
+// grokExpectedTokenCost is the expected token bill: below 200k prompt
 // tokens the base rates, from 200k on (inclusive) the long-context rates for
 // every token — input, cached input, visible output and reasoning alike.
 func grokExpectedTokenCost(prompt, cached, visibleOutput, reasoning int) float64 {

@@ -28,15 +28,18 @@
 -- (broker list, topic, group name, consumer count) into it, and add the
 -- ON CLUSTER clause your deployment needs.
 --
+-- Apply it after 005_video_input_columns.sql: the Kafka table below is
+-- rebuilt with the full column set, 005's video columns included.
+--
 -- Run it before (or together with) rolling out the AIR version that emits
 -- these fields, with AIR Kafka publishing paused. Safe to re-run on its own
--- -- but this is currently the last migration in the chain, so that's the
--- only direction that's safe: once a migration after this one exists, never
--- run 005 again on its own afterwards, for the same reason
+-- only while it is the last applied migration: once a later one has been
+-- applied, never run 006 again on its own, for the same reason
 -- 002_cache_web_search_columns.sql's doc comment spells out -- it would
--- rebuild air.spend_logs_kafka from only 005's column set, narrowing it
+-- rebuild air.spend_logs_kafka from only 006's column set, narrowing it
 -- back below whatever the later migration added, and break ingestion with
 -- NUMBER_OF_COLUMNS_DOESNT_MATCH until that later migration is re-applied.
+-- Apply the migrations forward, in order, never backward.
 
 DROP TABLE IF EXISTS air.spend_logs_mv;
 
@@ -109,6 +112,7 @@ CREATE TABLE air.spend_logs_kafka
     rejected_prediction_tokens UInt32,
     image_count UInt32,
     image_tokens UInt32,
+    video_input_tokens UInt32,
     output_image_tokens UInt32,
     web_search_requests UInt32,
     web_search_context_size Nullable(String),
@@ -133,6 +137,7 @@ CREATE TABLE air.spend_logs_kafka
     cached_output_cost Float64,
     prediction_cost Float64,
     image_cost Float64,
+    video_input_cost Float64,
     web_search_cost Float64,
     x_search_cost Float64,
     code_execution_cost Float64,
@@ -155,9 +160,9 @@ CREATE TABLE air.spend_logs_kafka
     requester_ip String,
     session_id String,
     overhead_ms Float64,
-    body_captured UInt8,              -- всегда 0 пока; поле-заглушка под будущий PR
-    body_request_bytes UInt32,        -- всегда 0 пока; поле-заглушка под будущий PR
-    body_response_bytes UInt32        -- всегда 0 пока; поле-заглушка под будущий PR
+    body_captured UInt8,
+    body_request_bytes UInt32,
+    body_response_bytes UInt32
 )
 ENGINE = Kafka
 SETTINGS
